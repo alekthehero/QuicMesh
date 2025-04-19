@@ -1,0 +1,21 @@
+<component name="ProjectRunConfigurationManager">
+  <configuration default="false" name="Start Socket Service" type="docker-deploy" factoryName="docker-compose.yml" server-name="Docker">
+    <deployment type="docker-compose.yml">
+      <settings>
+        <option name="envFilePath" value="" />
+        <option name="removeImagesOnComposeDown" value="ALL" />
+        <option name="services">
+          <list>
+            <option value="kafka-service" />
+            <option value="zookeeper-service" />
+            <option value="socket-service" />
+          </list>
+        </option>
+        <option name="sourceFilePath" value="compose.yaml" />
+      </settings>
+    </deployment>
+    <method v="2">
+      <option name="RunConfigurationTask" enabled="true" run_configuration_name="Build" run_configuration_type="MavenRunConfiguration" />
+    </method>
+  </configuration>
+</component>
