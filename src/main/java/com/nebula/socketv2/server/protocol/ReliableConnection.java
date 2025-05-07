@@ -40,7 +40,7 @@ public class ReliableConnection implements ApplicationProtocolConnection {
                 quicConnection.close();
                 return;
             }
-            user = jwt.getSubject();
+            user = jwt.getClaims().get("username").toString();
         }
         processMessage(stream);
     }

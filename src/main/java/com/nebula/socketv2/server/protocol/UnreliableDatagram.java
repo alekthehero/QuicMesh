@@ -31,7 +31,7 @@ public class UnreliableDatagram implements ApplicationProtocolConnection {
             logger.info(quicConnection.hashCode() + ": Authentication failed");
             return;
         }
-        user = jwt.getSubject();
+        user = jwt.getClaims().get("username").toString();
         logger.info(user + ": Authentication successful");
         if (message.equals("ping")) {
             logger.info(user + ": Sending message: pong");
