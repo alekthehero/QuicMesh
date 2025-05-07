@@ -8,7 +8,7 @@ WORKDIR /app
 COPY target/socketv2-0.0.1-SNAPSHOT.jar app.jar
 
 # Expose the port the application runs on
-EXPOSE 9001
+EXPOSE 9001/udp
 
 # Run the jar file
 ENTRYPOINT ["java", "-jar", "app.jar"]

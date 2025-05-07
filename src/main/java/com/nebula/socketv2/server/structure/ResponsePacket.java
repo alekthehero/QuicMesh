@@ -15,13 +15,4 @@ import java.util.Set;
 public class ResponsePacket {
 
     UpdateType updateType;
-
-    String sessionKey;
-
-    Set<String> lostPlayers;
-
-    Set<String> playerKeys;
-
-    Map<String, PlayerMotion> playerMotions;
-
 }

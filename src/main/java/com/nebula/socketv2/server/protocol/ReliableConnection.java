@@ -1,11 +1,8 @@
 package com.nebula.socketv2.server.protocol;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nebula.socketv2.server.structure.ResponsePacket;
-import com.nebula.socketv2.server.structure.UpdateType;
+import com.nebula.socketv2.server.authentication.JwkAuthentication;
 import org.slf4j.Logger;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.stereotype.Component;
 import tech.kwik.core.QuicConnection;
 import tech.kwik.core.QuicStream;
 import tech.kwik.core.server.ApplicationProtocolConnection;
@@ -17,81 +14,60 @@ import java.io.OutputStream;
 public class ReliableConnection implements ApplicationProtocolConnection {
 
     private final Logger logger = org.slf4j.LoggerFactory.getLogger(ReliableConnection.class);
+
+    private final JwkAuthentication jwkAuthentication;
+
     private QuicConnection quicConnection;
     private InputStream inputStream;
     private OutputStream outputStream;
     private boolean authenticated = false;
-    private final ObjectMapper objectMapper = new ObjectMapper();
-    private final JwtDecoder jwtDecoder;
 
-    public ReliableConnection(QuicConnection quicConnection, JwtDecoder jwtDecoder) {
+    public ReliableConnection(QuicConnection quicConnection, JwkAuthentication jwkAuthentication) {
         this.quicConnection = quicConnection;
-        this.jwtDecoder = jwtDecoder;
+        this.jwkAuthentication = jwkAuthentication;
     }
 
     @Override
     public void acceptPeerInitiatedStream(QuicStream stream) {
         inputStream = stream.getInputStream();
         outputStream = stream.getOutputStream();
+        logger.info(quicConnection.hashCode() + ": accepted peer initiated stream: " + stream.getStreamId());
         if (!authenticated) {
-            if (!authenticate()) {
-                logger.info("Authentication failed");
+            authenticated = jwkAuthentication.authenticate(inputStream, outputStream);
+            if (!authenticated) {
+                logger.warn(quicConnection.hashCode() + ": Authentication failed");
+                quicConnection.close();
                 return;
             }
-            authenticated = true;
-            logger.info("Authentication successful");
         }
         processMessage(stream);
-    }
-
-    private boolean authenticate() {
-        try {
-            byte[] bytes = new byte[1024];
-            int read = inputStream.read(bytes);
-            String token = new String(bytes, 0, read);
-            if (validToken(token)) {
-                authenticated = true;
-                ResponsePacket response = ResponsePacket.builder()
-                        .updateType(UpdateType.AUTHENTICATE)
-                        .build();
-                outputStream.write(objectMapper.writeValueAsBytes(response));
-                outputStream.flush();
-                return true;
-            }
-            logger.info("Authentication failed");
-            outputStream.write("Authentication failed".getBytes());
-            outputStream.flush();
-            outputStream.close();
-            quicConnection.close();
-            return false;
-        } catch (IOException e) {
-            logger.error("Error reading from stream: " + e.getMessage());
-            quicConnection.close();
-            return false;
-        }
-    }
-
-    private boolean validToken(String token) {
-        try {
-            Jwt jwt = jwtDecoder.decode(token);
-            logger.info("Token verification successful: " + jwt.getClaims());
-        } catch (Exception exception) {
-            logger.error("Token verification failed: " + exception.getMessage());
-            return false;
-        }
-        return false;
     }
 
     private void processMessage(QuicStream stream) {
         try {
             InputStream inputStream = stream.getInputStream();
+            OutputStream outputStream = stream.getOutputStream();
             byte[] bytes = new byte[1024];
             int numRead = inputStream.read(bytes);
-            logger.info("Received message: " + new String(bytes, 0, numRead));
-            OutputStream outputStream = stream.getOutputStream();
-            outputStream.write("Hello, World!".getBytes());
+            String message = new String(bytes, 0, numRead);
+            logger.info(quicConnection.hashCode() + ": Received Reliable message: " + message);
+            if (message.equals("ping")) {
+                outputStream.write("pong".getBytes());
+                outputStream.flush();
+                outputStream.close();
+                logger.info(quicConnection.hashCode() + ": Sent Reliable message: pong");
+                quicConnection.close();
+                logger.info(quicConnection.hashCode() + ": Closed connection");
+                return;
+            }
+            outputStream.write("Where my ping at".getBytes());
             outputStream.flush();
             outputStream.close();
+            logger.info(quicConnection.hashCode() + ": Sent Reliable message: Where my ping at");
+            quicConnection.close();
+            logger.info(quicConnection.hashCode() + ": Closed connection");
+
+
         } catch (IOException e) {
             logger.error("Error reading from stream: " + e.getMessage());
         }

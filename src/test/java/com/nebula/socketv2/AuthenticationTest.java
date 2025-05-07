@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 import tech.kwik.core.QuicClientConnection;
+import tech.kwik.core.QuicConnection;
 import tech.kwik.core.QuicStream;
 
 import java.io.IOException;
@@ -48,10 +49,16 @@ public class AuthenticationTest {
     @Test
     public void testAuthentication() throws IOException {
         assertNotNull(accessToken);
+        System.out.println(accessToken.getBytes().length);
 
         QuicClientConnection quicClientConnection = QuicClientConnection.newBuilder()
-                .uri(URI.create("https://localhost:9001"))
+                .uri(URI.create("localhost:9001"))
                 .applicationProtocol(Protocol)
+                .noServerCertificateCheck()
+                .host("localhost")
+                .port(9001)
+                .initialVersion(QuicConnection.QuicVersion.V2)
+                .preferIPv4()
                 .build();
         quicClientConnection.connect();
 
@@ -67,5 +74,58 @@ public class AuthenticationTest {
         System.out.println(response);
     }
 
+    @Tag("integration")
+    @Test
+    public void testMultipleConnections() throws IOException {
+        assertNotNull(accessToken);
+        System.out.println(accessToken.getBytes().length);
+
+        QuicClientConnection quicClientConnection = QuicClientConnection.newBuilder()
+                .uri(URI.create("localhost:9001"))
+                .applicationProtocol(Protocol)
+                .noServerCertificateCheck()
+                .host("localhost")
+                .port(9001)
+                .initialVersion(QuicConnection.QuicVersion.V2)
+                .preferIPv4().build();
+        quicClientConnection.connect();
+
+        QuicClientConnection quicClientConnection2 = QuicClientConnection.newBuilder()
+                .uri(URI.create("localhost:9001"))
+                .applicationProtocol(Protocol)
+                .noServerCertificateCheck()
+                .host("localhost")
+                .port(9001)
+                .initialVersion(QuicConnection.QuicVersion.V2)
+                .preferIPv4().build();
+        quicClientConnection2.connect();
+
+        QuicStream quicStream = quicClientConnection.createStream(true);
+        OutputStream outputStream = quicStream.getOutputStream();
+        outputStream.write(accessToken.getBytes());
+        outputStream.flush();
+
+        QuicStream quicStream2 = quicClientConnection2.createStream(true);
+        OutputStream outputStream2 = quicStream2.getOutputStream();
+        outputStream2.write(accessToken.getBytes());
+        outputStream2.flush();
+
+        InputStream inputStream = quicStream.getInputStream();
+        byte[] bytes = new byte[1024];
+        int read = inputStream.read(bytes);
+
+        String response = new String(bytes, 0, read);
+        System.out.println(response);
+
+        InputStream inputStream2 = quicStream2.getInputStream();
+        byte[] bytes2 = new byte[1024];
+        int read2 = inputStream2.read(bytes2);
+
+        String response2 = new String(bytes2, 0, read2);
+        System.out.println(response2);
+        quicClientConnection.close();
+        quicClientConnection2.close();
+        System.out.println("Passed");
+    }
 
 }

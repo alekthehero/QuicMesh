@@ -1,8 +1,10 @@
 package com.nebula.socketv2.server;
 
+import com.nebula.socketv2.server.authentication.JwkAuthentication;
 import com.nebula.socketv2.server.protocol.ApplicationProtocolFactory;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.stereotype.Component;
+import tech.kwik.core.QuicConnection;
 import tech.kwik.core.log.Logger;
 import tech.kwik.core.server.ServerConnectionConfig;
 import tech.kwik.core.server.ServerConnector;
@@ -17,16 +19,13 @@ public class Server {
     private static ServerConnector serverConnector;
     private static final String applicationProtocolId = "nebula";
     private static final ServerConnectionConfig serverConnectionConfig = ServerConnectionConfig.builder()
-            .maxOpenPeerInitiatedBidirectionalStreams(1)
-            .maxOpenPeerInitiatedUnidirectionalStreams(1)
+            .maxOpenPeerInitiatedBidirectionalStreams(2)
+            .maxOpenPeerInitiatedUnidirectionalStreams(2)
             .build();
+    private final JwkAuthentication jwkAuthentication;
 
-    private final JwtDecoder jwtDecoder;
-
-    public Server(JwtDecoder jwtDecoder) throws Exception {
-        this.jwtDecoder = jwtDecoder;
-
-        logger.info("Server Starting on port 9001");
+    public Server(JwkAuthentication authentication) throws Exception {
+        jwkAuthentication = authentication;
         try {
             KeyStore keyStore = KeyStoreLoader.loadKeyStore("keystore.jks", "454545");
             try {
@@ -46,8 +45,9 @@ public class Server {
                 .withLogger(logger)
                 .withKeyStore(keyStore, "alekthehero", "454545".toCharArray())
                 .withConfiguration(serverConnectionConfig)
+                .withSupportedVersion(QuicConnection.QuicVersion.V2)
                 .build();
-        serverConnector.registerApplicationProtocol(applicationProtocolId, new ApplicationProtocolFactory(jwtDecoder));
+        serverConnector.registerApplicationProtocol(applicationProtocolId, new ApplicationProtocolFactory(jwkAuthentication));
         serverConnector.start();
     }
 
