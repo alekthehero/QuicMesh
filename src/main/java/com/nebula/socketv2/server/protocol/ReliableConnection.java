@@ -2,7 +2,7 @@ package com.nebula.socketv2.server.protocol;
 
 import com.nebula.socketv2.server.authentication.JwkAuthentication;
 import org.slf4j.Logger;
-import org.springframework.stereotype.Component;
+import org.springframework.security.oauth2.jwt.Jwt;
 import tech.kwik.core.QuicConnection;
 import tech.kwik.core.QuicStream;
 import tech.kwik.core.server.ApplicationProtocolConnection;
@@ -20,7 +20,8 @@ public class ReliableConnection implements ApplicationProtocolConnection {
     private QuicConnection quicConnection;
     private InputStream inputStream;
     private OutputStream outputStream;
-    private boolean authenticated = false;
+    private Jwt jwt = null;
+    private String user = "user";
 
     public ReliableConnection(QuicConnection quicConnection, JwkAuthentication jwkAuthentication) {
         this.quicConnection = quicConnection;
@@ -32,13 +33,14 @@ public class ReliableConnection implements ApplicationProtocolConnection {
         inputStream = stream.getInputStream();
         outputStream = stream.getOutputStream();
         logger.info(quicConnection.hashCode() + ": accepted peer initiated stream: " + stream.getStreamId());
-        if (!authenticated) {
-            authenticated = jwkAuthentication.authenticate(inputStream, outputStream);
-            if (!authenticated) {
+        if (jwt == null) {
+            jwt = jwkAuthentication.authenticate(inputStream, outputStream);
+            if (jwt == null) {
                 logger.warn(quicConnection.hashCode() + ": Authentication failed");
                 quicConnection.close();
                 return;
             }
+            user = jwt.getSubject();
         }
         processMessage(stream);
     }
@@ -50,22 +52,22 @@ public class ReliableConnection implements ApplicationProtocolConnection {
             byte[] bytes = new byte[1024];
             int numRead = inputStream.read(bytes);
             String message = new String(bytes, 0, numRead);
-            logger.info(quicConnection.hashCode() + ": Received Reliable message: " + message);
+            logger.info(user + ": Received Reliable message: " + message);
             if (message.equals("ping")) {
                 outputStream.write("pong".getBytes());
                 outputStream.flush();
                 outputStream.close();
-                logger.info(quicConnection.hashCode() + ": Sent Reliable message: pong");
+                logger.info(user + ": Sent Reliable message: pong");
                 quicConnection.close();
-                logger.info(quicConnection.hashCode() + ": Closed connection");
+                logger.info(user + ": Closed connection");
                 return;
             }
             outputStream.write("Where my ping at".getBytes());
             outputStream.flush();
             outputStream.close();
-            logger.info(quicConnection.hashCode() + ": Sent Reliable message: Where my ping at");
+            logger.info(user + ": Sent Reliable message: Where my ping at");
             quicConnection.close();
-            logger.info(quicConnection.hashCode() + ": Closed connection");
+            logger.info(user + ": Closed connection");
 
 
         } catch (IOException e) {

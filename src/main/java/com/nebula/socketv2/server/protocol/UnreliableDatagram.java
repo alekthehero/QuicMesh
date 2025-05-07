@@ -2,6 +2,7 @@ package com.nebula.socketv2.server.protocol;
 
 import com.nebula.socketv2.server.authentication.JwkAuthentication;
 import org.slf4j.Logger;
+import org.springframework.security.oauth2.jwt.Jwt;
 import tech.kwik.core.QuicConnection;
 import tech.kwik.core.server.ApplicationProtocolConnection;
 
@@ -11,6 +12,8 @@ public class UnreliableDatagram implements ApplicationProtocolConnection {
     private final JwkAuthentication jwkAuthentication;
 
     private QuicConnection quicConnection;
+    private Jwt jwt = null;
+    private String user = "user";
 
     public UnreliableDatagram(QuicConnection quicConnection, JwkAuthentication jwkAuthentication) {
         this.quicConnection = quicConnection;
@@ -24,13 +27,14 @@ public class UnreliableDatagram implements ApplicationProtocolConnection {
         String token = recieved.substring(0, recieved.indexOf(":") + 1);
         String message = recieved.substring(recieved.indexOf(":") + 1);
         logger.info(quicConnection.hashCode() + ": Received datagram: " + message);
-        if (!jwkAuthentication.validToken(token)) {
+        if ((jwt = jwkAuthentication.validToken(token)) == null) {
             logger.info(quicConnection.hashCode() + ": Authentication failed");
             return;
         }
-        logger.info(quicConnection.hashCode() + ": Authentication successful");
+        user = jwt.getSubject();
+        logger.info(user + ": Authentication successful");
         if (message.equals("ping")) {
-            logger.info(quicConnection.hashCode() + ": Sending message: pong");
+            logger.info(user + ": Sending message: pong");
             quicConnection.sendDatagram("pong".getBytes());
         }
         quicConnection.close();

@@ -24,34 +24,35 @@ public class JwkAuthentication {
         this.jwtDecoder = jwtDecoder;
     }
 
-    public boolean authenticate(InputStream inputStream, OutputStream outputStream) {
+    public Jwt authenticate(InputStream inputStream, OutputStream outputStream) {
         try {
             byte[] read = inputStream.readAllBytes();
             String token = new String(read);
-            if (validToken(token)) {
+            Jwt jwt = null;
+            if ((jwt = validToken(token)) != null) {
                 ResponsePacket response = ResponsePacket.builder()
                         .updateType(UpdateType.AUTHENTICATE)
                         .build();
                 outputStream.write(mapper.writeValueAsBytes(response));
                 outputStream.flush();
-                return true;
+                return jwt;
             }
             outputStream.close();
-            return false;
+            return null;
         } catch (IOException e) {
             logger.error("Error reading from stream: " + e.getMessage());
-            return false;
+            return null;
         }
     }
 
-    public boolean validToken(String token) {
+    public Jwt validToken(String token) {
         try {
             Jwt jwt = jwtDecoder.decode(token);
-            return true;
+            return jwt;
         } catch (Exception exception) {
             logger.error("Error decoding token: " + token);
             logger.error("Token verification failed: " + exception.getMessage());
-            return false;
+            return null;
         }
     }
 }
